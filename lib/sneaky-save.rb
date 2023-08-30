@@ -46,6 +46,7 @@ module SneakySave
 
     # Remove the id field for databases like Postgres
     # which fail with id passed as NULL
+    binding.pry
     if id.nil? && !prefetch_pk_allowed
       attributes_values.reject! { |key, _| key.name == 'id' }
     end
@@ -70,23 +71,15 @@ module SneakySave
 
     changed_attributes = sneaky_update_fields
 
-    # Serialize values for rails3 before updating
-    unless sneaky_new_rails?
-      serialized_fields = self.class.serialized_attributes.keys & changed_attributes.keys
-      serialized_fields.each do |field|
-        changed_attributes[field] = @attributes[field].serialized_value
-      end
-    end
-
     !self.class.unscoped.where(pk => original_id).
       update_all(changed_attributes).zero?
   end
 
   def sneaky_attributes_values
-    if sneaky_new_rails?
-      send :arel_attributes_with_values_for_create, attribute_names
-    else
-      send :arel_attributes_values
+    binding.pry
+    attributes_with_values = send :attributes_with_values_for_create, attribute_names
+    attributes_with_values.each_with_object({}) do |attribute_value, hash|
+      hash[self.class.send(:arel_attribute, attribute_value[0])] = attribute_value[1]
     end
   end
 
@@ -97,15 +90,7 @@ module SneakySave
   end
 
   def sneaky_connection
-    if sneaky_new_rails?
-      self.class.connection
-    else
-      connection
-    end
-  end
-
-  def sneaky_new_rails?
-    ActiveRecord::VERSION::STRING.to_i > 3
+    self.class.connection
   end
 end
 
